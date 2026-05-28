@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./backend/config.json:/app/config.json
+    restart: unless-stopped

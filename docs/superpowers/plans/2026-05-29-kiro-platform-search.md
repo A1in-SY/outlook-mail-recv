@@ -55,7 +55,7 @@ if __name__ == "__main__":
 Run:
 
 ```bash
-PYTHONPATH=backend python -m unittest backend.tests.test_platforms
+PYTHONPATH=backend backend/.venv/bin/python -m unittest backend.tests.test_platforms
 ```
 
 Expected: FAIL with an assertion that `"Kiro"` is not present in `PLATFORM_LIST`.
@@ -77,7 +77,7 @@ The existing `sorted([...])` wrapper will place `Kiro` correctly in API response
 Run:
 
 ```bash
-PYTHONPATH=backend python -m unittest backend.tests.test_platforms
+PYTHONPATH=backend backend/.venv/bin/python -m unittest backend.tests.test_platforms
 ```
 
 Expected: PASS with 2 tests.
@@ -122,7 +122,7 @@ test("filterPlatforms returns an empty list when no platform matches", () => {
 Run from `frontend/`:
 
 ```bash
-rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
+rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --ignoreConfig --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
 ```
 
 Expected: FAIL because `src/lib/platform-filter.ts` does not exist yet.
@@ -152,7 +152,7 @@ export function filterPlatforms<T extends SearchablePlatform>(platforms: T[], qu
 Run from `frontend/`:
 
 ```bash
-rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
+rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --ignoreConfig --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
 ```
 
 Expected: PASS with 3 tests.
@@ -286,7 +286,7 @@ Render `filteredPlatforms` instead of `allPlatforms`, and render this empty stat
 Run from `frontend/`:
 
 ```bash
-rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
+rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --ignoreConfig --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
 ```
 
 Expected: PASS with 3 tests.
@@ -311,7 +311,7 @@ Expected: TypeScript build and Vite production build complete successfully.
 Run:
 
 ```bash
-PYTHONPATH=backend python -m unittest discover backend/tests
+PYTHONPATH=backend backend/.venv/bin/python -m unittest discover backend/tests
 ```
 
 Expected: PASS for the backend test suite.
@@ -321,7 +321,7 @@ Expected: PASS for the backend test suite.
 Run from `frontend/`:
 
 ```bash
-rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
+rm -rf /tmp/outlook-platform-filter-test && ./node_modules/.bin/tsc --ignoreConfig --module commonjs --target es2023 --types node --skipLibCheck --esModuleInterop --outDir /tmp/outlook-platform-filter-test --rootDir . src/lib/platform-filter.ts tests/platform-filter.test.ts && node --test /tmp/outlook-platform-filter-test/tests/platform-filter.test.js
 ```
 
 Expected: PASS with 3 tests.
@@ -335,4 +335,3 @@ npm run build
 ```
 
 Expected: TypeScript build and Vite production build complete successfully.
-

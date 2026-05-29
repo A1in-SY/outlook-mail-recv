@@ -15,6 +15,7 @@ PLATFORM_LIST = sorted([
     "Facebook",
     "Gemini",
     "GitHub",
+    "Kiro",
     "LinkedIn",
     "Midjourney",
     "Microsoft",

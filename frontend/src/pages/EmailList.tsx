@@ -45,12 +45,12 @@ export function EmailList() {
     return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
   };
 
-  const load = useCallback(async (pageOverride = page) => {
-    if (!accountId || !folder) return;
+  const load = useCallback(async (pageToLoad: number) => {
+    if (!accountId || !folder || Number.isNaN(accId)) return;
     setLoading(true);
     try {
       const [items, acc] = await Promise.all([
-        api.emails.list(accId, folder, pageOverride, pageSize),
+        api.emails.list(accId, folder, pageToLoad, pageSize),
         api.accounts.get(accId),
       ]);
       setEmails(items.items);
@@ -61,27 +61,37 @@ export function EmailList() {
     } finally {
       setLoading(false);
     }
-  }, [accId, accountId, folder, page]);
+  }, [accId, accountId, folder]);
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void load();
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [load]);
-
-  const handleRefresh = async () => {
-    if (!accountId || !folder) return;
+  const refreshAndLoad = useCallback(async () => {
+    if (!accountId || !folder || Number.isNaN(accId)) return;
     setRefreshing(true);
+    setLoading(true);
     try {
       await api.emails.refresh(accId, folder);
       setPage(1);
       await load(1);
     } catch (e: unknown) {
       alert("刷新失败: " + errorMessage(e));
+      setLoading(false);
     } finally {
       setRefreshing(false);
     }
+  }, [accId, accountId, folder, load]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setEmails([]);
+      setTotal(0);
+      setAccountEmail("");
+      void refreshAndLoad();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [refreshAndLoad]);
+
+  const handlePageChange = (pageToLoad: number) => {
+    setPage(pageToLoad);
+    void load(pageToLoad);
   };
 
   const openEmail = async (email: EmailItem) => {
@@ -113,7 +123,7 @@ export function EmailList() {
                   <Button variant="outline" onClick={() => navigate("/")}>
                     <ArrowLeft className="w-4 h-4 mr-1" />返回
                   </Button>
-                  <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                  <Button variant="outline" onClick={() => void refreshAndLoad()} disabled={refreshing}>
                     <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
                     {refreshing ? "刷新中..." : "刷新"}
                   </Button>
@@ -194,7 +204,7 @@ export function EmailList() {
                   第 {page} / {totalPages} 页
                 </span>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => handlePageChange(page - 1)}>
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
@@ -208,13 +218,13 @@ export function EmailList() {
                         key={pageNum}
                         variant={pageNum === page ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setPage(pageNum)}
+                        onClick={() => handlePageChange(pageNum)}
                       >
                         {pageNum}
                       </Button>
                     );
                   })}
-                  <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                  <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => handlePageChange(page + 1)}>
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>

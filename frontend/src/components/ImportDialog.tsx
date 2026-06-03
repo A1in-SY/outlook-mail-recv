@@ -68,6 +68,12 @@ export function ImportDialog({ open, onOpenChange, onImport, onTestProtocol }: P
     if (!validateInputs(lines)) return;
     setLoading(true);
     try {
+      try {
+        await onTestProtocol(lines[0].trim(), separator, enabledProtocols);
+      } catch (e: unknown) {
+        toast.error("协议测试失败: " + errorMessage(e));
+        return;
+      }
       await onImport(lines, separator, enabledProtocols);
       setText("");
       onOpenChange(false);

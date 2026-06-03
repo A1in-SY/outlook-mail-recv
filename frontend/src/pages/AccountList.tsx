@@ -85,7 +85,12 @@ export function AccountList() {
     }
   }, [page, search, platformFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [load]);
 
   const handleImport = async (lines: string[], separator: string, enabledProtocols: MailProtocol[]) => {
     const res = await api.accounts.import(lines, separator, enabledProtocols);
@@ -98,7 +103,14 @@ export function AccountList() {
     load();
   };
 
+  const handleProtocolTest = (line: string, separator: string, enabledProtocols: MailProtocol[]) =>
+    api.accounts.testProtocol(line, separator, enabledProtocols);
+
   const handleExport = async (separator: string, ids?: number[]) => {
+    if (!separator.trim()) {
+      toast.error("分隔符不能为空");
+      return;
+    }
     const res = await api.accounts.export(separator, ids);
     setExportData(res.lines.join("\n"));
   };
@@ -364,7 +376,12 @@ export function AccountList() {
         </Card>
       </div>
 
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImport={handleImport}
+        onTestProtocol={handleProtocolTest}
+      />
       <ExportDialog open={exportOpen} onOpenChange={setExportOpen} data={exportData} onExport={handleExport} />
       {platformDialogAccount && (
         <PlatformUsageDialog

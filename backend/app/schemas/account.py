@@ -1,4 +1,5 @@
 from datetime import datetime
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
@@ -44,6 +45,31 @@ class AccountImportRequest(BaseModel):
     lines: List[str]
     separator: str = "----"
     enabled_protocols: List[str] = DEFAULT_PROTOCOLS.copy()
+
+    @field_validator("separator")
+    @classmethod
+    def validate_separator(cls, value):
+        if not value or not value.strip():
+            raise HTTPException(400, "Separator cannot be empty")
+        return value
+
+    @field_validator("enabled_protocols", mode="before")
+    @classmethod
+    def validate_enabled_protocols(cls, value):
+        return normalize_protocols(value)
+
+
+class AccountImportTestRequest(BaseModel):
+    line: str
+    separator: str = "----"
+    enabled_protocols: List[str] = DEFAULT_PROTOCOLS.copy()
+
+    @field_validator("separator")
+    @classmethod
+    def validate_separator(cls, value):
+        if not value or not value.strip():
+            raise HTTPException(400, "Separator cannot be empty")
+        return value
 
     @field_validator("enabled_protocols", mode="before")
     @classmethod

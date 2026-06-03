@@ -18,6 +18,7 @@ interface Props {
 export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
   const [separator, setSeparator] = useState("----");
   const [copied, setCopied] = useState(false);
+  const separatorValid = separator.trim().length > 0;
 
   const handleCopy = async () => {
     try {
@@ -50,6 +51,14 @@ export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const handleRefreshPreview = () => {
+    if (!separatorValid) {
+      toast.error("分隔符不能为空");
+      return;
+    }
+    onExport(separator);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -64,7 +73,7 @@ export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
               onChange={(e) => setSeparator(e.target.value)}
               className="w-32"
             />
-            <Button variant="outline" size="sm" onClick={() => onExport(separator)}>
+            <Button variant="outline" size="sm" onClick={handleRefreshPreview} disabled={!separatorValid}>
               刷新预览
             </Button>
           </div>

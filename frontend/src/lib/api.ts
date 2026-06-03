@@ -77,6 +77,11 @@ export interface EmailItem {
   body_fetched: boolean;
 }
 
+export interface ProtocolTestResult {
+  ok: boolean;
+  protocol: MailProtocol;
+}
+
 export const api = {
   accounts: {
     list: (page = 1, size = 20, search = "", availableFor?: number[]) => {
@@ -102,6 +107,11 @@ export const api = {
       request<{ imported: number; skipped: number; errors: string[] }>(
         "/accounts/import",
         { method: "POST", body: JSON.stringify({ lines, separator, enabled_protocols }) }
+      ),
+    testProtocol: (line: string, separator: string, enabled_protocols: MailProtocol[]) =>
+      request<ProtocolTestResult>(
+        "/accounts/import/test-protocol",
+        { method: "POST", body: JSON.stringify({ line, separator, enabled_protocols }) }
       ),
     export: (separator: string, ids?: number[]) => {
       let url = `/accounts/export?separator=${encodeURIComponent(separator)}`;

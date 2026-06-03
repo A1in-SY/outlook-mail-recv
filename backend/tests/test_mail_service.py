@@ -1,7 +1,13 @@
 import unittest
 from unittest.mock import patch
 
-from app.services.mail_service import fetch_graph_email_list, fetch_imap_email_list, get_access_token
+from app.services.mail_service import (
+    fetch_graph_email_list,
+    fetch_imap_email_list,
+    get_access_token,
+    test_graph_email_access,
+    test_imap_email_access,
+)
 
 
 class MailServiceTests(unittest.TestCase):
@@ -135,6 +141,51 @@ class MailServiceTests(unittest.TestCase):
         with patch("app.services.mail_service._imap_connect", return_value=(FakeMail(), "new-refresh", None)):
             with self.assertRaises(Exception):
                 fetch_imap_email_list("user@example.com", "client", "refresh", "INBOX")
+
+    def test_imap_access_test_succeeds_with_empty_mailbox(self):
+        class FakeMail:
+            def select(self, folder, readonly=True):
+                return "OK", []
+
+            def uid(self, command, *args):
+                if command == "search":
+                    return "OK", [b""]
+                raise AssertionError(f"unexpected uid command {command}")
+
+            def logout(self):
+                pass
+
+        with patch("app.services.mail_service._imap_connect", return_value=(FakeMail(), "new-refresh", None)):
+            new_refresh_token, rt_expires_in = test_imap_email_access(
+                "user@example.com",
+                "client",
+                "refresh",
+                "INBOX",
+            )
+
+        self.assertEqual(new_refresh_token, "new-refresh")
+        self.assertIsNone(rt_expires_in)
+
+    def test_graph_access_test_uses_minimal_message_query(self):
+        calls = []
+
+        def fake_graph_get(url, access_token, params=None):
+            calls.append((url, access_token, params))
+            return {"value": []}
+
+        with patch("app.services.mail_service.get_access_token", return_value=("access", "new-refresh", None)):
+            with patch("app.services.mail_service._graph_get", fake_graph_get):
+                new_refresh_token, rt_expires_in = test_graph_email_access(
+                    "user@example.com",
+                    "client",
+                    "refresh",
+                    "INBOX",
+                )
+
+        self.assertEqual(new_refresh_token, "new-refresh")
+        self.assertIsNone(rt_expires_in)
+        self.assertEqual(calls[0][1], "access")
+        self.assertEqual(calls[0][2], {"$select": "id", "$top": "1"})
 
 
 if __name__ == "__main__":

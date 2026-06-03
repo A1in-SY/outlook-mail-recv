@@ -6,8 +6,9 @@ from app.core.database import get_db
 from app.core.auth import verify_token
 from app.models.account import Account
 from app.models.platform import Platform, account_platforms
-from app.core.protocols import protocols_to_json
-from app.schemas.account import AccountCreate, AccountImportRequest, AccountUpdate, AccountOut
+from app.core.protocols import choose_protocol, protocols_to_json
+from app.schemas.account import AccountCreate, AccountImportRequest, AccountImportTestRequest, AccountUpdate, AccountOut
+from app.services.mail_service import test_email_access
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -23,6 +24,23 @@ def _apply_platform_filter(query, available_for: Optional[List[int]]):
         )
         query = query.filter(not_(Account.id.in_(used_account_ids)))
     return query
+
+
+def _validate_separator(separator: str):
+    if not separator or not separator.strip():
+        raise HTTPException(400, "Separator cannot be empty")
+
+
+def _parse_import_line(line: str, separator: str) -> tuple[str, str, str, str]:
+    _validate_separator(separator)
+    line = line.strip()
+    if not line:
+        raise ValueError("empty line")
+    parts = line.split(separator)
+    if len(parts) < 4:
+        raise ValueError(f"insufficient fields (need 4, got {len(parts)})")
+    email_addr, password, client_id, refresh_token = [p.strip() for p in parts[:4]]
+    return email_addr, password, client_id, refresh_token
 
 
 @router.get("", response_model=List[AccountOut])
@@ -73,16 +91,16 @@ def create_account(data: AccountCreate, db: Session = Depends(get_db), _: str = 
 @router.post("/import")
 def import_accounts(data: AccountImportRequest, db: Session = Depends(get_db), _: str = Depends(verify_token)):
     imported, skipped, errors = 0, 0, []
+    _validate_separator(data.separator)
     enabled_protocols = protocols_to_json(data.enabled_protocols)
     for i, line in enumerate(data.lines, 1):
-        line = line.strip()
-        if not line:
+        if not line.strip():
             continue
-        parts = line.split(data.separator)
-        if len(parts) < 4:
-            errors.append(f"Line {i}: insufficient fields (need 4, got {len(parts)})")
+        try:
+            email_addr, password, client_id, refresh_token = _parse_import_line(line, data.separator)
+        except ValueError as e:
+            errors.append(f"Line {i}: {e}")
             continue
-        email_addr, password, client_id, refresh_token = [p.strip() for p in parts[:4]]
         if db.query(Account).filter(Account.email == email_addr).first():
             skipped += 1
             continue
@@ -98,8 +116,25 @@ def import_accounts(data: AccountImportRequest, db: Session = Depends(get_db), _
     return {"imported": imported, "skipped": skipped, "errors": errors}
 
 
+@router.post("/import/test-protocol")
+def test_import_protocol(data: AccountImportTestRequest, _: str = Depends(verify_token)):
+    _validate_separator(data.separator)
+    try:
+        email_addr, _, client_id, refresh_token = _parse_import_line(data.line, data.separator)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    protocol = choose_protocol(data.enabled_protocols)
+    try:
+        test_email_access(email_addr, client_id, refresh_token, "INBOX", protocol)
+    except Exception as e:
+        raise HTTPException(502, f"Protocol test failed: {e}")
+    return {"ok": True, "protocol": protocol}
+
+
 @router.get("/export")
 def export_accounts(separator: str = "----", ids: Optional[List[int]] = Query(None), db: Session = Depends(get_db), _: str = Depends(verify_token)):
+    _validate_separator(separator)
     query = db.query(Account).order_by(Account.id)
     if ids:
         query = query.filter(Account.id.in_(ids))

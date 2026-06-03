@@ -261,6 +261,19 @@ def fetch_imap_email_body(email_address: str, client_id: str, refresh_token: str
         _logout(mail)
 
 
+def test_imap_email_access(email_address: str, client_id: str, refresh_token: str, folder: str = "INBOX") -> tuple:
+    """Returns (new_refresh_token, rt_expires_in) when IMAP list access succeeds."""
+    mail, new_refresh_token, rt_expires_in = _imap_connect(email_address, client_id, refresh_token)
+    try:
+        _select_imap_folder(mail, folder)
+        status, _ = mail.uid("search", None, "ALL")
+        if status != "OK":
+            raise Exception("Mail search failed")
+        return new_refresh_token, rt_expires_in
+    finally:
+        _logout(mail)
+
+
 def _graph_headers(access_token: str) -> dict:
     return {
         "Authorization": f"Bearer {access_token}",
@@ -350,6 +363,18 @@ def fetch_graph_email_body(email_address: str, client_id: str, refresh_token: st
     return body_data, new_refresh_token, rt_expires_in
 
 
+def test_graph_email_access(email_address: str, client_id: str, refresh_token: str, folder: str = "INBOX") -> tuple:
+    """Returns (new_refresh_token, rt_expires_in) when Graph list access succeeds."""
+    access_token, new_refresh_token, rt_expires_in = get_access_token(client_id, refresh_token, "graph")
+    folder_id = GRAPH_FOLDER_IDS.get(folder)
+    if not folder_id:
+        raise Exception(f"Unsupported Graph folder '{folder}'")
+
+    url = f"{GRAPH_BASE}/me/mailFolders/{folder_id}/messages"
+    _graph_get(url, access_token, params={"$select": "id", "$top": "1"})
+    return new_refresh_token, rt_expires_in
+
+
 def fetch_email_list(
     email_address: str,
     client_id: str,
@@ -362,6 +387,14 @@ def fetch_email_list(
         return fetch_graph_email_list(email_address, client_id, refresh_token, folder, known_external_ids)
     if protocol == "imap":
         return fetch_imap_email_list(email_address, client_id, refresh_token, folder, known_external_ids)
+    raise Exception(f"Unsupported protocol '{protocol}'")
+
+
+def test_email_access(email_address: str, client_id: str, refresh_token: str, folder: str, protocol: str) -> tuple:
+    if protocol == "graph":
+        return test_graph_email_access(email_address, client_id, refresh_token, folder)
+    if protocol == "imap":
+        return test_imap_email_access(email_address, client_id, refresh_token, folder)
     raise Exception(f"Unsupported protocol '{protocol}'")
 
 

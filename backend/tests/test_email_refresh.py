@@ -141,6 +141,35 @@ class EmailRefreshTests(unittest.TestCase):
         finally:
             db.close()
 
+    def test_list_emails_empty_cache_does_not_fetch_remote(self):
+        db = self.Session()
+        try:
+            account = Account(
+                email="empty@example.com",
+                password="pw",
+                client_id="client",
+                refresh_token="refresh",
+                enabled_protocols='["imap"]',
+            )
+            db.add(account)
+            db.commit()
+            db.refresh(account)
+
+            def fail_fetch(*args):
+                raise AssertionError("list_emails should not fetch remote mail")
+
+            original_fetch = email_routes.fetch_email_list
+            email_routes.fetch_email_list = fail_fetch
+            try:
+                result = email_routes.list_emails(account.id, "INBOX", db=db, _="token")
+            finally:
+                email_routes.fetch_email_list = original_fetch
+
+            self.assertEqual(result["items"], [])
+            self.assertEqual(result["total"], 0)
+        finally:
+            db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,16 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+type LoadOptions = {
+  showLoading?: boolean;
+  showError?: boolean;
+};
+
+type RefreshOptions = {
+  showState?: boolean;
+  showError?: boolean;
+};
+
 export function EmailList() {
   const { accountId, folder } = useParams<{ accountId: string; folder: string }>();
   const navigate = useNavigate();
@@ -45,9 +55,11 @@ export function EmailList() {
     return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
   };
 
-  const load = useCallback(async (pageToLoad: number) => {
+  const load = useCallback(async (pageToLoad: number, options: LoadOptions = {}) => {
     if (!accountId || !folder || Number.isNaN(accId)) return;
-    setLoading(true);
+    const showLoading = options.showLoading ?? true;
+    const showError = options.showError ?? true;
+    if (showLoading) setLoading(true);
     try {
       const [items, acc] = await Promise.all([
         api.emails.list(accId, folder, pageToLoad, pageSize),
@@ -57,37 +69,49 @@ export function EmailList() {
       setTotal(items.total);
       setAccountEmail(acc.email);
     } catch (e: unknown) {
-      alert("加载失败: " + errorMessage(e));
+      if (showError) {
+        alert("加载失败: " + errorMessage(e));
+      } else {
+        console.error("加载失败:", e);
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [accId, accountId, folder]);
 
-  const refreshAndLoad = useCallback(async () => {
+  const refreshAndLoad = useCallback(async (options: RefreshOptions = {}) => {
     if (!accountId || !folder || Number.isNaN(accId)) return;
-    setRefreshing(true);
-    setLoading(true);
+    const showState = options.showState ?? true;
+    const showError = options.showError ?? true;
+    if (showState) {
+      setRefreshing(true);
+      setLoading(true);
+    }
     try {
       await api.emails.refresh(accId, folder);
       setPage(1);
-      await load(1);
+      await load(1, { showLoading: showState, showError });
     } catch (e: unknown) {
-      alert("刷新失败: " + errorMessage(e));
-      setLoading(false);
+      if (showError) {
+        alert("刷新失败: " + errorMessage(e));
+      } else {
+        console.error("刷新失败:", e);
+      }
+      if (showState) setLoading(false);
     } finally {
-      setRefreshing(false);
+      if (showState) setRefreshing(false);
     }
   }, [accId, accountId, folder, load]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      setEmails([]);
-      setTotal(0);
-      setAccountEmail("");
-      void refreshAndLoad();
+      setPage(1);
+      void load(1).then(() => {
+        void refreshAndLoad({ showState: false, showError: false });
+      });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [refreshAndLoad]);
+  }, [load, refreshAndLoad]);
 
   const handlePageChange = (pageToLoad: number) => {
     setPage(pageToLoad);

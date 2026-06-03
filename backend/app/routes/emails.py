@@ -104,18 +104,6 @@ def list_emails(account_id: int, folder: str, page: int = 1, size: int = 20, db:
         raise HTTPException(404, "Account not found")
 
     protocol = _selected_protocol(account)
-    cached = db.query(Email).filter(
-        Email.account_id == account_id,
-        Email.folder == folder,
-        Email.source_protocol == protocol,
-    ).count()
-    if cached == 0:
-        try:
-            _do_fetch(db, account, folder)
-        except Exception as e:
-            logger.exception("Fetch emails failed for account %s folder %s", account_id, folder)
-            raise HTTPException(502, "Failed to fetch emails from mail server")
-
     query = db.query(Email).filter(
         Email.account_id == account_id,
         Email.folder == folder,

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmailViewDialog } from "@/components/EmailViewDialog";
 import { CopyBtn } from "@/components/CopyBtn";
 import { PlatformUsageDialog } from "@/components/PlatformUsageDialog";
+import { toast } from "sonner";
 import {
   ArrowLeft, RefreshCw, Eye, ChevronLeft, ChevronRight, Mail, Trash2, Wrench, ExternalLink,
 } from "lucide-react";
@@ -70,7 +71,7 @@ export function EmailList() {
       setAccountEmail(acc.email);
     } catch (e: unknown) {
       if (showError) {
-        alert("加载失败: " + errorMessage(e));
+        toast.error("加载失败: " + errorMessage(e));
       } else {
         console.error("加载失败:", e);
       }
@@ -93,7 +94,7 @@ export function EmailList() {
       await load(1, { showLoading: showState, showError });
     } catch (e: unknown) {
       if (showError) {
-        alert("刷新失败: " + errorMessage(e));
+        toast.error("刷新失败: " + errorMessage(e));
       } else {
         console.error("刷新失败:", e);
       }
@@ -128,7 +129,7 @@ export function EmailList() {
       setSelectedEmail(detail);
       setEmails((current) => current.map((item) => (item.id === detail.id ? detail : item)));
     } catch (e: unknown) {
-      alert("加载正文失败: " + errorMessage(e));
+      toast.error("加载正文失败: " + errorMessage(e));
     } finally {
       setDetailLoading(false);
     }

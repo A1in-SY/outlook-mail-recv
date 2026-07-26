@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "核对新状态码分类是否与约定一致，且 spec 已同步更新"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "核对报错与日志未泄露 token / 密码"}

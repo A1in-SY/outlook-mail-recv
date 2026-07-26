@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, type EmailItem } from "@/lib/api";
+import { errorMessage, showFailure } from "@/lib/error-display";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -15,9 +16,6 @@ import {
   ArrowLeft, RefreshCw, Eye, ChevronLeft, ChevronRight, Mail, Trash2, Wrench, ExternalLink,
 } from "lucide-react";
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
 
 type LoadOptions = {
   showLoading?: boolean;
@@ -97,7 +95,7 @@ export function EmailList() {
       await load(1, { showLoading: showState, showError });
     } catch (e: unknown) {
       if (showError) {
-        toast.error("刷新失败: " + errorMessage(e));
+        showFailure("刷新失败: ", e);
       } else {
         console.error("刷新失败:", e);
       }
@@ -132,7 +130,7 @@ export function EmailList() {
       setSelectedEmail(detail);
       setEmails((current) => current.map((item) => (item.id === detail.id ? detail : item)));
     } catch (e: unknown) {
-      toast.error("加载正文失败: " + errorMessage(e));
+      showFailure("加载正文失败: ", e);
     } finally {
       setDetailLoading(false);
     }

@@ -29,6 +29,30 @@ function notifyUnauthorized() {
   window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
 }
 
+/** Carries the HTTP status so callers can tell a dead account from a passing glitch. */
+export class ApiError extends Error {
+  // Assigned in the body rather than as a parameter property: the tsconfig sets
+  // `erasableSyntaxOnly`, which rejects the shorthand.
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/**
+ * The mailbox credential is no longer usable (banned, revoked, or expired). Deliberately
+ * not 401/403: `request()` treats 403 as *this app's* bearer token being bad and logs the
+ * user out, so a dead mailbox must not share that code.
+ */
+export const ACCOUNT_AUTH_STATUS = 409;
+
+export function isAccountAuthError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === ACCOUNT_AUTH_STATUS;
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -49,7 +73,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    throw new ApiError(err.detail || `HTTP ${res.status}`, res.status);
   }
   return res.json();
 }

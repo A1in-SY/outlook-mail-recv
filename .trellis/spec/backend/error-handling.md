@@ -21,9 +21,32 @@ Current status-code conventions:
 - `400` for invalid user input, for example an empty import separator, an unsupported protocol, an invalid folder, or invalid platform IDs.
 - `403` for invalid bearer token in `verify_token()`.
 - `404` when a requested account or email does not exist.
-- `502` when an upstream mail, IMAP, Graph, or token-refresh operation fails.
+- `409` when a stored mailbox credential is no longer usable. See "Account Credential Failures" below.
+- `502` when an upstream mail, IMAP, Graph, or token-refresh operation fails *transiently*.
 
 Keep error details short and user-readable. Existing frontend code reads `detail` in `frontend/src/lib/api.ts` and displays it through toast messages.
+
+### Do not reuse 403 for mailbox credentials
+
+`frontend/src/lib/api.ts` treats `403` as *this application's* bearer token being rejected: it calls `clearToken()` and redirects to login. A dead **mailbox** credential must therefore never return `403`, or refreshing a banned account would sign the operator out of the whole app.
+
+`409` was chosen because it is unused elsewhere in this API and reads as "the stored resource conflicts with the request". It is not a widespread convention for this case, which is exactly why it is written down here.
+
+## Account Credential Failures
+
+Microsoft rejects a dead credential deterministically; retrying never helps. Conflating that with a transient network fault leaves the user unable to tell "this account is banned" from "try again", so the two are separated.
+
+`AccountAuthError` in `backend/app/services/mail_service.py` marks the permanent case. Routes catch it before the generic `except Exception` and return `ACCOUNT_AUTH_STATUS` (409) with the reason as `detail`; everything else stays `502`.
+
+Classify as `AccountAuthError`:
+
+- The token endpoint returns `error == "invalid_grant"`. Dispatch on that machine-readable field, **not** on substring matches against `error_description` — Microsoft rewords the prose freely. `AAD_ERROR_MESSAGES` maps known `AADSTS` codes to actionable Chinese text; unknown codes fall back to a generic "needs re-authorisation" message, since `invalid_grant` already proves the credential is dead.
+- IMAP `authenticate()` raises `imaplib.IMAP4.error`. A token was just minted successfully, so the rejection is the mailbox refusing the account.
+- Graph returns `401` or `403`.
+
+Leave as a plain `Exception` (→ 502): timeouts, connection failures, 5xx from the token endpoint or Graph, non-JSON error bodies, other OAuth error codes, and folder/search/fetch failures.
+
+Log these with `logger.warning(...)` and the reason rather than `logger.exception(...)`. A banned account emits one on every refresh click, so a stack trace per click is noise — the condition is expected and self-explanatory.
 
 ## Validation
 
@@ -41,11 +64,21 @@ Note that this project currently raises `HTTPException` from some Pydantic valid
 
 External service failures should be caught at the route boundary, logged, and converted to `HTTPException(502, ...)`.
 
+Catch `AccountAuthError` first, then fall through to the generic handler:
+
+```python
+except AccountAuthError as e:
+    logger.warning("Account credential rejected for account %s folder %s: %s", account_id, folder, e)
+    raise HTTPException(ACCOUNT_AUTH_STATUS, str(e))
+except Exception:
+    logger.exception("Refresh emails failed for account %s folder %s", account_id, folder)
+    raise HTTPException(502, "Failed to fetch emails from mail server")
+```
+
 Examples:
 
-- `test_import_protocol()` catches `test_email_access()` failures and returns `"Protocol test failed: ..."` with status 502.
-- `get_email_detail()` logs the exception and returns `"Failed to fetch email body from mail server"` with status 502.
-- `refresh_emails()` logs the account and folder, then returns `"Failed to fetch emails from mail server"` with status 502.
+- `test_import_protocol()` catches `test_email_access()` failures: 409 with the reason for `AccountAuthError`, otherwise `"Protocol test failed: ..."` with status 502.
+- `get_email_detail()` and `refresh_emails()` follow the same two-branch shape.
 
 Do not leak full access tokens, refresh tokens, passwords, or raw account secrets in error responses.
 
@@ -78,3 +111,4 @@ Examples:
 - `backend/tests/test_account_import.py::test_import_rejects_empty_separator`
 - `backend/tests/test_account_import.py::test_protocol_test_returns_bad_gateway_on_external_failure`
 - `backend/tests/test_mail_service.py::test_imap_email_list_raises_when_header_fetch_fails`
+- `backend/tests/test_account_auth_errors.py` — covers both sides of the permanent/transient split, and asserts the auth status is never 403.

@@ -21,6 +21,55 @@ GRAPH_FOLDER_IDS = {
     "Junk": "junkemail",
 }
 
+# Microsoft error codes that mean the stored credential is dead, mapped to what the
+# operator actually has to do about it. Anything not listed falls back to the generic
+# "re-authorise" message, so an unrecognised code still reads as a credential problem
+# rather than as a server fault.
+AAD_ERROR_MESSAGES = {
+    "70000": "账号已被微软风控标记为滥用，refresh token 已失效，需要重新授权",
+    "50076": "账号要求多因素认证，当前 refresh token 无法完成，需要重新授权",
+    "50173": "密码已变更或会话已被撤销，refresh token 失效，需要重新授权",
+    "700082": "refresh token 已过期（超过 90 天未使用），需要重新授权",
+}
+DEFAULT_AUTH_ERROR_MESSAGE = "账号凭据已失效，需要重新授权"
+
+AAD_CODE_RE = re.compile(r"AADSTS(\d+)")
+
+
+class AccountAuthError(Exception):
+    """The stored credential is no longer usable and retrying will not help.
+
+    Kept distinct from the plain Exceptions this module raises for transient upstream
+    trouble: the route layer turns this into a 409 with the reason attached, while
+    everything else stays a 502. Without the distinction a permanently dead account and
+    a momentary network blip are indistinguishable to the user, who can only keep
+    clicking refresh.
+    """
+
+
+def _classify_token_error(resp) -> None:
+    """Raises AccountAuthError if the token endpoint rejected the credential itself.
+
+    Returns normally when the failure looks transient, leaving the caller to raise its
+    own generic exception.
+    """
+    try:
+        body = resp.json()
+    except ValueError:
+        return
+    if not isinstance(body, dict):
+        return
+
+    # Dispatch on the machine-readable `error` field rather than substring-matching
+    # error_description: the description is prose Microsoft can reword at any time.
+    if body.get("error") != "invalid_grant":
+        return
+
+    description = str(body.get("error_description") or "")
+    match = AAD_CODE_RE.search(description)
+    code = match.group(1) if match else None
+    raise AccountAuthError(AAD_ERROR_MESSAGES.get(code, DEFAULT_AUTH_ERROR_MESSAGE))
+
 
 def get_access_token(client_id: str, refresh_token: str, protocol: str | None = None) -> tuple:
     """Returns (access_token, new_refresh_token, rt_expires_in_seconds)."""
@@ -33,6 +82,7 @@ def get_access_token(client_id: str, refresh_token: str, protocol: str | None = 
         data["scope"] = TOKEN_SCOPES[protocol]
     resp = requests.post(TOKEN_URL, data=data, timeout=30)
     if resp.status_code != 200:
+        _classify_token_error(resp)
         raise Exception(f"Token refresh failed: {resp.status_code} - {resp.text}")
     body = resp.json()
     token = body.get("access_token")
@@ -123,7 +173,11 @@ def _imap_connect(email_address: str, client_id: str, refresh_token: str):
         mail.authenticate("XOAUTH2", lambda x: auth_string.encode())
     except imaplib.IMAP4.error as e:
         _logout(mail)
-        raise Exception(f"IMAP auth failed: {e}")
+        # The token endpoint just handed us an access token, so a rejection here is the
+        # mailbox refusing the account rather than a transport problem -- in production
+        # this shows up as "User is authenticated but not connected." on accounts that
+        # are also failing token refresh with AADSTS70000.
+        raise AccountAuthError(f"IMAP 认证被拒绝，账号可能已被封禁或需要重新授权：{e}")
     return mail, new_refresh_token, rt_expires_in
 
 
@@ -284,6 +338,11 @@ def _graph_headers(access_token: str) -> dict:
 
 def _graph_get(url: str, access_token: str, params: dict | None = None) -> dict:
     resp = requests.get(url, headers=_graph_headers(access_token), params=params, timeout=30)
+    # 401/403 here means the mailbox rejected a token we had just successfully minted,
+    # which is the Graph equivalent of the IMAP auth rejection above. Other 4xx/5xx are
+    # request or service problems and stay transient.
+    if resp.status_code in (401, 403):
+        raise AccountAuthError("邮箱拒绝访问，账号可能已被封禁或需要重新授权")
     if resp.status_code >= 400:
         raise Exception(f"Graph request failed: {resp.status_code} - {resp.text}")
     return resp.json()
@@ -416,7 +475,7 @@ def fetch_emails(email_address: str, client_id: str, refresh_token: str, folder:
         mail.authenticate("XOAUTH2", lambda x: auth_string.encode())
     except imaplib.IMAP4.error as e:
         _logout(mail)
-        raise Exception(f"IMAP auth failed: {e}")
+        raise AccountAuthError(f"IMAP 认证被拒绝，账号可能已被封禁或需要重新授权：{e}")
 
     status, _ = mail.select(folder, readonly=True)
     if status != "OK":

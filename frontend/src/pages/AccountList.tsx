@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, clearToken, type Account, type AccountUpdate, type MailProtocol } from "@/lib/api";
+import { errorMessage } from "@/lib/error-display";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,10 +36,6 @@ const PINNED_BG = "bg-card";
 const PINNED_BG_SELECTED = "bg-[color-mix(in_oklch,var(--muted)_30%,var(--card))]";
 const PINNED_BG_HOVER = "group-hover:bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))]";
 const PINNED_BG_HEAD = "bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))]";
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function MaskedField({ value }: { value: string }) {
   const [show, setShow] = useState(false);

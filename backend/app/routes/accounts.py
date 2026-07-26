@@ -8,9 +8,12 @@ from app.models.account import Account
 from app.models.platform import Platform, account_platforms
 from app.core.protocols import choose_protocol, protocols_to_json
 from app.schemas.account import AccountCreate, AccountImportRequest, AccountImportTestRequest, AccountUpdate, AccountOut
-from app.services.mail_service import test_email_access
+from app.services.mail_service import AccountAuthError, test_email_access
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
+
+# See the note on ACCOUNT_AUTH_STATUS in app/routes/emails.py for why this is not 403.
+ACCOUNT_AUTH_STATUS = 409
 
 
 def _apply_platform_filter(query, available_for: Optional[List[int]]):
@@ -127,6 +130,8 @@ def test_import_protocol(data: AccountImportTestRequest, _: str = Depends(verify
     protocol = choose_protocol(data.enabled_protocols)
     try:
         test_email_access(email_addr, client_id, refresh_token, "INBOX", protocol)
+    except AccountAuthError as e:
+        raise HTTPException(ACCOUNT_AUTH_STATUS, str(e))
     except Exception as e:
         raise HTTPException(502, f"Protocol test failed: {e}")
     return {"ok": True, "protocol": protocol}

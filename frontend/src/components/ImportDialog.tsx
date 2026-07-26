@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { FileText, RefreshCw, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { MailProtocol, ProtocolTestResult } from "@/lib/api";
+import { errorMessage, showFailure } from "@/lib/error-display";
 
 interface Props {
   open: boolean;
@@ -16,9 +17,6 @@ interface Props {
   onTestProtocol: (line: string, separator: string, enabledProtocols: MailProtocol[]) => Promise<ProtocolTestResult>;
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function ImportDialog({ open, onOpenChange, onImport, onTestProtocol }: Props) {
   const [separator, setSeparator] = useState("----");
@@ -71,7 +69,7 @@ export function ImportDialog({ open, onOpenChange, onImport, onTestProtocol }: P
       try {
         await onTestProtocol(lines[0].trim(), separator, enabledProtocols);
       } catch (e: unknown) {
-        toast.error("协议测试失败: " + errorMessage(e));
+        showFailure("协议测试失败: ", e);
         return;
       }
       await onImport(lines, separator, enabledProtocols);
@@ -92,7 +90,7 @@ export function ImportDialog({ open, onOpenChange, onImport, onTestProtocol }: P
       const result = await onTestProtocol(lines[0].trim(), separator, enabledProtocols);
       toast.success(`协议测试成功: ${result.protocol.toUpperCase()}`);
     } catch (e: unknown) {
-      toast.error("协议测试失败: " + errorMessage(e));
+      showFailure("协议测试失败: ", e);
     } finally {
       setTesting(false);
     }

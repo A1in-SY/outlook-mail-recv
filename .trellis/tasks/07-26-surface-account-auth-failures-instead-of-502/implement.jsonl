@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "现有状态码约定与路由边界模式，本次要改的正是它记录的 502 约定"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "失败路径要记日志，且不得泄露 token"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端测试与代码质量要求"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端 toast 改动的质量基线"}

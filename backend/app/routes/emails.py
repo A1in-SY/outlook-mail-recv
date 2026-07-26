@@ -8,13 +8,18 @@ from app.core.protocols import choose_protocol, protocols_from_json
 from app.models.account import Account
 from app.models.email import Email
 from app.schemas.email import EmailOut
-from app.services.mail_service import fetch_email_body, fetch_email_list
+from app.services.mail_service import AccountAuthError, fetch_email_body, fetch_email_list
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
 VALID_FOLDERS = ("INBOX", "Junk")
+
+# 409 rather than 401/403: `frontend/src/lib/api.ts` treats 403 as "the app's own bearer
+# token is bad" and logs the user out globally, so reusing it for a dead *mailbox*
+# credential would sign the operator out whenever they refreshed a banned account.
+ACCOUNT_AUTH_STATUS = 409
 
 
 def _selected_protocol(account: Account) -> str:
@@ -89,6 +94,9 @@ def get_email_detail(email_id: int, db: Session = Depends(get_db), _: str = Depe
             _update_token(account, new_refresh_token, rt_expires_in)
             db.commit()
             db.refresh(email)
+        except AccountAuthError as e:
+            logger.warning("Account credential rejected for email %s: %s", email_id, e)
+            raise HTTPException(ACCOUNT_AUTH_STATUS, str(e))
         except Exception:
             logger.exception("Fetch email body failed for email %s", email_id)
             raise HTTPException(502, "Failed to fetch email body from mail server")
@@ -123,7 +131,12 @@ def refresh_emails(account_id: int, folder: str, db: Session = Depends(get_db), 
         raise HTTPException(404, "Account not found")
     try:
         _do_fetch(db, account, folder)
-    except Exception as e:
+    except AccountAuthError as e:
+        # Expected and self-explanatory, so a warning with the reason beats a stack
+        # trace: a banned account produces one of these on every refresh click.
+        logger.warning("Account credential rejected for account %s folder %s: %s", account_id, folder, e)
+        raise HTTPException(ACCOUNT_AUTH_STATUS, str(e))
+    except Exception:
         logger.exception("Refresh emails failed for account %s folder %s", account_id, folder)
         raise HTTPException(502, "Failed to fetch emails from mail server")
     return {"ok": True}

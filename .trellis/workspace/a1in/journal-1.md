@@ -182,11 +182,27 @@ covers all three `clearToken()` call sites without any of them knowing the cache
 - 23 of the 25 seeded platforms have no account associations at all; only ChatGPT and
   Claude are actually in use.
 
+### Deployment
+
+Pushed as `ee44278` and deployed to txy-sg. Same guard rails as the previous deploy:
+`data/outlook_mail.db.bak-before-deploy-20260726-231401`, and the outgoing image tagged
+`outlook-mail-recv-app:rollback-f62f252` before rebuilding - only `:latest` exists
+otherwise, so a rebuild would have destroyed the rollback path.
+
+Verified after `docker compose up -d`:
+
+- Image bundles match the locally verified build exactly (`index-KNU2ZnPn.js`,
+  `index-CEt-qT0N.css`), and those are the hashes the server actually serves
+- Served CSS contains both `--destructive-foreground` values and the
+  `.text-destructive-foreground` utility; served JS contains `auth:session-ended`
+- `/` returns 200, clean uvicorn startup
+- DB intact: 74 accounts, 25 platforms, 64 associations (61 earlier in the day - the app
+  was in use between the two deploys)
+
 ### Status
 
-[OK] **Completed**
+[OK] **Completed** - committed, pushed, deployed.
 
 ### Next Steps
 
-- Redeploy to txy-sg has *not* been requested for these fixes. The server still runs
-  `f62f252`.
+- `feat/frontend-ux-improvements` is deployed but still unmerged to `main`.

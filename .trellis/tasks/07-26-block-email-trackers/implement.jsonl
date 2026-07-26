@@ -1,0 +1,3 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "frontend/src/components/EmailViewDialog.tsx", "reason": "唯一渲染 HTML 的位置，屏蔽逻辑接入点"}
+{"file": "frontend/src/lib/verification-code.ts", "reason": "同类纯函数 + 测试的现有写法参考"}

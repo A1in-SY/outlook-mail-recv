@@ -136,4 +136,9 @@
   html {
     @apply font-sans;
     }
+  /* An <img> stripped of its src renders as a broken-image icon, which reads as a bug
+     rather than as a deliberate block. This shows a neutral placeholder instead. */
+  img[data-blocked-remote] {
+    @apply inline-block h-5 w-5 rounded border border-dashed border-muted-foreground/40 bg-muted/40 align-middle;
+    }
 }

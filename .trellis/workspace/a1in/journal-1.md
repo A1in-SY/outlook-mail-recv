@@ -434,9 +434,38 @@ written into the spec and pinned by a test asserting the status is not 403.
   token. Probe went through the app's own `get_access_token` and wrote nothing; the
   container's file was restored afterwards and verified unpatched.
 
+### Deployment
+
+Pushed `main` (`5652b56`) and deployed. Same guard rails as before:
+`data/outlook_mail.db.bak-before-deploy-20260726-e1290b0`, and the outgoing image tagged
+`outlook-mail-recv-app:rollback-e1290b0` before rebuilding — only `:latest` exists
+otherwise, so a rebuild destroys the rollback path.
+
+Before pushing, confirmed the currently-served bundle contained **neither** `ApiError`
+nor `status===409`. Without that step the post-deploy grep would prove nothing — a
+marker that was already there matches either way.
+
+Verified after `docker compose up -d`:
+
+- Served bundles match the locally verified build exactly (`index-JRQmS-tZ.js`,
+  `index-CsSYUXc9.css`), and the served JS now contains both markers
+- Image backend has `AccountAuthError` in all three files and `ACCOUNT_AUTH_STATUS = 409`
+  in both route modules
+- **End-to-end through the real HTTP route**: `id=26` → `409` with
+  `{"detail":"账号已被微软风控标记为滥用，refresh token 已失效，需要重新授权"}`, `id=73`
+  → `200 {"ok":true}`. This is the account that had been returning an opaque 502.
+- Log shows one `Account credential rejected for account 26 folder INBOX: <reason>`
+  warning, no stack trace — the intended shape
+- `/` returns 200, clean uvicorn startup
+- DB intact: 74 accounts, 25 platforms, 67 associations, 507 emails
+
+Note for future probes: the folder path segment is case-sensitive, `INBOX` not `inbox` —
+a lowercase one 400s at validation before ever reaching the auth path, which looks like
+the fix failing.
+
 ### Status
 
-[OK] **Completed** — committed as `85ef010` on `main`. **Not deployed.**
+[OK] **Completed** — `85ef010`, journal `5652b56`, deployed to txy-sg.
 
 ### Next Steps
 

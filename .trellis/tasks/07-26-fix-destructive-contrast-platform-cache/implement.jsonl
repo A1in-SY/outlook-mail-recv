@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "frontend/src/index.css", "reason": "补全 --destructive-foreground token"}
+{"file": "frontend/src/components/PlatformUsageDialog.tsx", "reason": "平台列表请求发起处"}
+{"file": "frontend/src/lib/api.ts", "reason": "platforms.list 定义处"}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { api, type Platform } from "@/lib/api";
+import { type Platform } from "@/lib/api";
+import { loadPlatforms } from "@/lib/platform-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -28,7 +29,7 @@ export function PlatformFilterDialog({ open, onOpenChange, selected, onConfirm }
     setLocalSelected(new Set(selected));
     setPlatformSearch("");
     setLoading(true);
-    api.platforms.list().then(setPlatforms).catch((e) => {
+    loadPlatforms().then(setPlatforms).catch((e) => {
       toast.error("加载平台列表失败: " + e.message);
     }).finally(() => setLoading(false));
   }, [open, selected]);

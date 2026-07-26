@@ -8,8 +8,14 @@ export function setToken(token: string) {
   localStorage.setItem("auth_token", token);
 }
 
+/** Fires whenever the session ends, by logout or by a rejected token. */
+export const SESSION_ENDED_EVENT = "auth:session-ended";
+
 export function clearToken() {
   localStorage.removeItem("auth_token");
+  // Announced here rather than at each call site so per-session caches cannot be
+  // left stale by a logout path that forgets to clear them.
+  window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
 }
 
 export function hasToken(): boolean {

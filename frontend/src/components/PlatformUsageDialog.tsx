@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api, type Platform } from "@/lib/api";
+import { loadPlatforms } from "@/lib/platform-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -30,7 +31,7 @@ export function PlatformUsageDialog({ open, onOpenChange, accountId, accountEmai
     setPlatformSearch("");
     setLoading(true);
     Promise.all([
-      api.platforms.list(),
+      loadPlatforms(),
       api.accounts.getPlatforms(accountId),
     ]).then(([platforms, used]) => {
       setAllPlatforms(platforms);

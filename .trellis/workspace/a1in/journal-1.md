@@ -102,6 +102,91 @@ extraction (kept to the detail dialog only).
 - The backend could not be started locally: system Python is 3.9.6 but
   `backend/app/core/config.py` uses `dict | None`, which needs 3.10+.
 
+### Status
+
+[OK] **Completed** - committed as `f62f252` on `feat/frontend-ux-improvements`, deployed
+to txy-sg (verified by matching the `index-Bq9NibwW.js` bundle hash between the local
+and server builds). The branch is not yet merged to `main`.
+
 ### Next Steps
 
-- Uncommitted. Changes are ready for review.
+- Follow-up review feedback handled in Session 3.
+
+---
+
+## Session 3: Delete Button Contrast + Platform List Cache
+
+**Date**: 2026-07-26
+**Task**: `07-26-fix-destructive-contrast-platform-cache`
+**Branch**: `feat/frontend-ux-improvements`
+
+### Summary
+
+Two pieces of review feedback on Session 2's work: the 删除 button's label was hard to
+read in light mode, and the platform dialogs refetched `/api/platforms` on every open.
+
+### Main Changes
+
+**1. `--destructive-foreground` was never defined.**
+
+`ui/button.tsx` and `ui/badge.tsx` both reference `text-destructive-foreground`, but the
+token was missing from *two* layers: the `@theme inline` mapping
+(`--color-destructive-foreground`) and the `:root`/`.dark` values. The class therefore
+resolved to nothing and the text inherited `--foreground`, landing at 4.15:1 on the red
+fill - below the 4.5:1 AA floor. Both layers are now defined.
+
+Dark mode needed the *opposite* value, not a copy: its `--destructive` is a lighter red,
+so the readable pairing there is a near-black foreground.
+
+| Mode | Foreground | Background | Ratio |
+|------|-----------|------------|-------|
+| Light | `oklch(0.985 0 0)` -> rgb(250,250,250) | rgb(231,0,11) | **4.57:1** |
+| Dark | `oklch(0.145 0 0)` -> rgb(10,10,10) | rgb(255,100,103) | **6.85:1** |
+
+**2. `lib/platform-cache.ts` - module-level cache for the platform list.**
+
+The original suggestion was to drop the request entirely and hardcode a shared enum on
+both sides. Investigated and rejected: the frontend sends platform **IDs**, and
+`account_platforms.platform_id` stores them, but IDs are DB insertion order, *not*
+`PLATFORM_LIST` order. Production has `id=2 -> Google` (a platform absent from the code's
+list entirely) and `id=25 -> Kiro` (appended later). Hardcoding alphabetical IDs would
+have silently misaligned all 61 existing associations - 41 accounts tagged ChatGPT and 20
+tagged Claude would have pointed at the wrong platforms. A cache gets the same
+"no repeated request" outcome with no data-model risk.
+
+The cache holds the in-flight promise as well as the resolved array, since both dialogs
+can open before either request settles. Failures are never retained, so one offline
+moment cannot leave every later open showing an empty list.
+
+Invalidation on logout goes through a new `SESSION_ENDED_EVENT` dispatched from
+`clearToken()`. Importing the cache from `api.ts` would have been circular, and this also
+covers all three `clearToken()` call sites without any of them knowing the cache exists.
+
+### Testing
+
+- [OK] `npm test` - 21/21 pass (6 new cache tests: dedup across repeated opens,
+  concurrent dedup, shared data, failure not cached + retry, shared failure, invalidate)
+- [OK] `npm run lint` - 5 errors, identical to the pre-existing baseline
+- [OK] `npm run build` - clean
+- [OK] Browser verification, contrast: measured on the **real** delete button in both
+  themes. Computed colors come back as `oklch(...)`, so each is bounced through a 1x1
+  canvas to resolve it to sRGB bytes before computing the ratio. Both pass AA.
+- [OK] Browser verification, cache: 4 dialog opens across both dialog types and 2
+  different accounts issued **1** `/api/platforms` request; after logout + re-login the
+  count went to 2, confirming invalidation works. Zero console errors.
+
+### Notes
+
+- The `DialogContent` `aria-describedby` warnings in the console are pre-existing Radix
+  a11y hints that fire for every dialog in the app - not introduced here.
+- 23 of the 25 seeded platforms have no account associations at all; only ChatGPT and
+  Claude are actually in use.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Redeploy to txy-sg has *not* been requested for these fixes. The server still runs
+  `f62f252`.

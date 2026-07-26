@@ -312,12 +312,32 @@ effect body.
   text body, so HTML blocking cannot affect it)
 - [OK] Browser: placeholders render as dashed boxes, no broken-image glyph
 
+### Deployment
+
+Merged to `main` and deployed. `main` was strictly behind with linear history, so
+`--ff-only` applied all 8 commits with no merge commit - matching the repo's existing
+history (it has no merge commits).
+
+The server checkout was on `feat/frontend-ux-improvements`; switched it to `main` and
+pulled. Same guard rails as before: `data/outlook_mail.db.bak-before-deploy-20260726-234802`,
+and the outgoing image tagged `outlook-mail-recv-app:rollback-ee44278` before rebuilding -
+only `:latest` exists otherwise, so a rebuild destroys the rollback path.
+
+Verified after `docker compose up -d`:
+
+- Image bundles match the locally verified build exactly (`index-CF6otB7H.js`,
+  `index-CsSYUXc9.css`), and those are the hashes the server actually serves
+- Served JS contains `data-blocked-remote`, `已屏蔽`, `显示图片`,
+  `afterSanitizeAttributes` and the blank-pixel GIF; served CSS contains the
+  `img[data-blocked-remote]` placeholder rule
+- `/` returns 200, clean uvicorn startup
+- DB intact: 74 accounts, 25 platforms, 65 associations, 505 emails
+
 ### Status
 
-[OK] **Completed** - committed as `c073de7`. **Not deployed** - the user has not asked
-for it.
+[OK] **Completed** - `c073de7`, merged to `main` (`e1290b0`) and deployed to txy-sg.
 
 ### Next Steps
 
-- Deploy when requested. Server currently runs `ee44278`.
-- `feat/frontend-ux-improvements` is deployed but still unmerged to `main`.
+- `feat/frontend-ux-improvements` is now fully merged; it can be deleted whenever
+  convenient.

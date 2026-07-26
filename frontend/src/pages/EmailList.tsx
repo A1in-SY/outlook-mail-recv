@@ -8,6 +8,7 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmailViewDialog } from "@/components/EmailViewDialog";
 import { CopyBtn } from "@/components/CopyBtn";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { PlatformUsageDialog } from "@/components/PlatformUsageDialog";
 import { toast } from "sonner";
 import {
@@ -34,7 +35,8 @@ export function EmailList() {
   const [emails, setEmails] = useState<EmailItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -69,6 +71,7 @@ export function EmailList() {
       setEmails(items.items);
       setTotal(items.total);
       setAccountEmail(acc.email);
+      setLoaded(true);
     } catch (e: unknown) {
       if (showError) {
         toast.error("加载失败: " + errorMessage(e));
@@ -167,13 +170,16 @@ export function EmailList() {
                     </Button>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/emails/${accountId}/${folder === "Junk" ? "INBOX" : "Junk"}`)}
-                >
-                  <ExternalLink className="w-4 h-4 mr-1" />
-                  {folder === "Junk" ? "收件箱" : "垃圾箱"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/emails/${accountId}/${folder === "Junk" ? "INBOX" : "Junk"}`)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    {folder === "Junk" ? "收件箱" : "垃圾箱"}
+                  </Button>
+                  <ThemeToggle />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -182,8 +188,13 @@ export function EmailList() {
               <span className="text-sm text-muted-foreground">共 {total} 封邮件</span>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
+            <div className="border rounded-lg overflow-hidden relative">
+              {loading && loaded && (
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10">
+                  <div className="h-full w-1/3 bg-primary animate-pulse" />
+                </div>
+              )}
+              <Table className={loading && loaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-[250px]">发件人</TableHead>
@@ -193,7 +204,7 @@ export function EmailList() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading ? (
+                  {!loaded ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         加载中...

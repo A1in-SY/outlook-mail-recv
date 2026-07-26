@@ -3,6 +3,9 @@ import DOMPurify from "dompurify";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { CopyBtn } from "@/components/CopyBtn";
+import { extractVerificationCode } from "@/lib/verification-code";
+import { KeyRound } from "lucide-react";
 import type { EmailItem } from "@/lib/api";
 
 interface Props {
@@ -33,6 +36,10 @@ export function EmailViewDialog({ open, onOpenChange, email, loading = false }: 
     });
   }, [bodyHtml]);
 
+  const subject = email?.subject ?? "";
+  const body = email?.body ?? "";
+  const code = useMemo(() => extractVerificationCode(subject, body), [subject, body]);
+
   if (!email) return null;
 
   return (
@@ -42,6 +49,14 @@ export function EmailViewDialog({ open, onOpenChange, email, loading = false }: 
           <DialogTitle className="text-lg">{email.subject || "(无主题)"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
+          {code && (
+            <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+              <KeyRound className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-xs text-muted-foreground shrink-0">验证码</span>
+              <span className="font-mono text-xl font-semibold tracking-[0.2em] select-all">{code}</span>
+              <CopyBtn text={code} />
+            </div>
+          )}
           <div className="flex gap-2">
             <span className="text-muted-foreground shrink-0">发件人:</span>
             <span className="break-all">{email.sender}</span>

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "评审清单与高风险模式：lint/build 验证命令、禁止直接 fetch、禁止 any、禁止在 ui/ 加业务逻辑"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "校验新增弹窗是否符合受控弹窗、DialogTitle、可访问性与 toast 反馈约定"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "校验新增 API 类型与验证码纯函数的类型安全、type-only import 与测试覆盖"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "校验 Set 状态不可原地修改、筛选变更重置分页、未引入全局状态库"}

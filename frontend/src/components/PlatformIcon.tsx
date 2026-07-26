@@ -27,11 +27,27 @@ const SLUG_MAP: Record<string, string> = {
   "Twitter/X":  "x",
 };
 
+// Brands like GitHub (#181717), Claude (#191919) and Cursor (#000000) ship near-black
+// logos that disappear against the dark background, so those are recoloured to the
+// theme foreground. A CSS class beats the `fill` presentation attribute, so every
+// other brand keeps its own hex untouched.
+const DARK_LOGO_LUMINANCE = 0.18;
+
+function relativeLuminance(hex: string) {
+  const value = parseInt(hex, 16);
+  const channel = (bits: number) => {
+    const srgb = ((value >> bits) & 0xff) / 255;
+    return srgb <= 0.03928 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0);
+}
+
 export function PlatformIcon({ platform, size = 18 }: { platform: Platform; size?: number }) {
   const slug = SLUG_MAP[platform.name];
   const icon = slug ? ICONS[slug] : null;
 
   if (icon) {
+    const dimInDark = relativeLuminance(icon.hex) < DARK_LOGO_LUMINANCE;
     return (
       <span
         title={platform.name}
@@ -44,6 +60,7 @@ export function PlatformIcon({ platform, size = 18 }: { platform: Platform; size
           width={size}
           height={size}
           fill={`#${icon.hex}`}
+          className={dimInDark ? "dark:fill-foreground" : undefined}
           xmlns="http://www.w3.org/2000/svg"
         >
           <path d={icon.path} />

@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端技术栈与本地架构规则：文件归属边界（pages / components / components-ui / lib）、@/ 别名、验证命令"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "本任务新增 ConfirmDialog / EditAccountDialog 两个业务弹窗，需遵循受控弹窗 open/onOpenChange 约定、命名导出、Props 接口、shadcn 原语复用与 DOMPurify 安全要求"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "涉及批量删除的 Set 选择状态、搜索防抖后的分页重置、主题状态与 auth token 状态管理边界"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "搜索防抖、鉴权校验、主题同步均涉及 useEffect/useCallback 与 setTimeout 清理模式；同时约束是否该抽自定义 hook"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "新增 api.accounts.update 与验证码纯工具函数，需遵循 API 类型集中在 api.ts、禁止 any、纯工具函数配 Node 测试的要求"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "确认弹窗与复制能力需复用现有 CopyBtn / ui primitives，避免重复实现剪贴板降级逻辑"}

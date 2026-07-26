@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterPlatforms } from "../src/lib/platform-filter";
+import { filterPlatforms } from "../src/lib/platform-filter.ts";
 
 const platforms = [
   { id: 1, name: "ChatGPT" },

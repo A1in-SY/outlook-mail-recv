@@ -144,12 +144,16 @@ export function ImportDialog({ open, onOpenChange, onImport, onTestProtocol }: P
             className="font-mono text-sm"
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
+          <span className="text-xs text-muted-foreground mr-auto">
+            协议测试与导入前校验均只使用第一行数据
+          </span>
           <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
           <Button
             variant="outline"
             onClick={handleTestProtocol}
             disabled={testing || loading || !text.trim() || !separatorValid || enabledProtocols.length === 0}
+            title="使用第一行数据测试所选协议是否可用"
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${testing ? "animate-spin" : ""}`} />
             {testing ? "测试中..." : "协议测试"}

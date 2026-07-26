@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Download, Copy, Check } from "lucide-react";
+
+const SEPARATOR_DEBOUNCE_MS = 300;
 
 interface Props {
   open: boolean;
@@ -19,6 +21,20 @@ export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
   const [separator, setSeparator] = useState("----");
   const [copied, setCopied] = useState(false);
   const separatorValid = separator.trim().length > 0;
+  // The parent recreates onExport every render, so it is kept in a ref instead of
+  // an effect dependency.
+  const onExportRef = useRef(onExport);
+  useEffect(() => {
+    onExportRef.current = onExport;
+  });
+
+  // The owning page already fetches once when opening, so only later edits refetch.
+  const initialSeparator = useRef(separator);
+  useEffect(() => {
+    if (!open || !separatorValid || separator === initialSeparator.current) return;
+    const timeout = window.setTimeout(() => onExportRef.current(separator), SEPARATOR_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [open, separator, separatorValid]);
 
   const handleCopy = async () => {
     try {
@@ -51,14 +67,6 @@ export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const handleRefreshPreview = () => {
-    if (!separatorValid) {
-      toast.error("分隔符不能为空");
-      return;
-    }
-    onExport(separator);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -73,9 +81,9 @@ export function ExportDialog({ open, onOpenChange, data, onExport }: Props) {
               onChange={(e) => setSeparator(e.target.value)}
               className="w-32"
             />
-            <Button variant="outline" size="sm" onClick={handleRefreshPreview} disabled={!separatorValid}>
-              刷新预览
-            </Button>
+            <span className="text-xs text-muted-foreground">
+              {separatorValid ? "修改分隔符后预览自动更新" : "分隔符不能为空"}
+            </span>
           </div>
           {data && (
             <>

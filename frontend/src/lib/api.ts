@@ -16,6 +16,13 @@ export function hasToken(): boolean {
   return !!getToken();
 }
 
+export const UNAUTHORIZED_EVENT = "auth:unauthorized";
+
+/** Router-level listeners redirect on this, which avoids a full-page reload. */
+function notifyUnauthorized() {
+  window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -30,7 +37,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (res.status === 403) {
     clearToken();
-    window.location.href = "/";
+    notifyUnauthorized();
     throw new Error("Authentication required");
   }
 
@@ -61,6 +68,14 @@ export interface Account {
   enabled_protocols: MailProtocol[];
   rt_expires_at: string | null;
   platforms: Platform[];
+}
+
+/** Mirrors backend AccountUpdate: every field is optional and patched when present. */
+export interface AccountUpdate {
+  password?: string;
+  client_id?: string;
+  refresh_token?: string;
+  enabled_protocols?: MailProtocol[];
 }
 
 export interface EmailItem {
@@ -101,6 +116,8 @@ export const api = {
     get: (id: number) => request<Account>(`/accounts/${id}`),
     create: (data: Omit<Account, "id">) =>
       request<Account>("/accounts", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: AccountUpdate) =>
+      request<Account>(`/accounts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (id: number) =>
       request<{ ok: boolean }>(`/accounts/${id}`, { method: "DELETE" }),
     import: (lines: string[], separator: string, enabled_protocols: MailProtocol[]) =>

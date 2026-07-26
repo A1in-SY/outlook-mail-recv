@@ -206,3 +206,118 @@ Verified after `docker compose up -d`:
 ### Next Steps
 
 - `feat/frontend-ux-improvements` is deployed but still unmerged to `main`.
+
+---
+
+## Session 4: Block Email Trackers
+
+**Date**: 2026-07-26
+**Task**: `07-26-block-email-trackers`
+**Branch**: `feat/frontend-ux-improvements`
+
+### Summary
+
+Opening a message let its remote resources phone home, leaking the open time and client
+IP. For a tool managing throwaway accounts in bulk that is worse than for an ordinary mail
+client: a callback confirms to the platform that the address is live and watched, which is
+the signal that gets those accounts flagged. Remote resources are now blocked by default
+with a per-message opt-in.
+
+### Measured the problem before designing for it
+
+Scanned all 505 stored messages rather than assuming:
+
+| Metric | Count |
+|---|---|
+| Messages | 505 |
+| With HTML body | 99 |
+| Remote `<img>` | 273 |
+| **Of those, 1-3px beacons** | **95** |
+| Messages with CSS `url()` | 38 |
+
+Beacon hosts are all ESP open-tracking endpoints (`u20216706.ct.sendgrid.net` 57,
+`url8792.mail.anthropic.com` 27, `mandrillapp.com` 7, ...); legitimate images are brand
+logos (`cdn.openai.com` 109, `claude.ai` 48).
+
+This is what settled the design question. A beacon can be any size at any path, and the
+same ESP host serves both beacons and logos, so **neither a size heuristic nor a host
+allowlist can separate them**. Full blocking with an explicit per-message opt-in is the
+only approach with no way to slip through, and is what Gmail / Thunderbird / Proton do.
+
+### Main Changes
+
+**`lib/tracker-blocking.ts` (new)** - stripping runs inside a DOMPurify
+`afterSanitizeAttributes` hook, not as a pass over the output string. The timing *is* the
+mechanism: DOMPurify parses into a detached template the browser fetches nothing for, so
+attributes are gone before the markup reaches the live DOM. Post-processing rendered nodes
+would be too late - the request fires the instant `dangerouslySetInnerHTML` commits.
+
+Vectors covered: `img src/srcset/lowsrc/dynsrc`, `source`, `video src/poster`,
+`audio/embed/track`, `iframe/frame`, `object data`, `background=`, `link href`, SVG
+`image href` / `use xlink:href`, plus `url()` and `@import` in both inline styles and
+`<style>` blocks. `cid:`, `data:` and bare fragments are local and stay.
+
+**`EmailViewDialog.tsx`** - the notice ("已屏蔽 N 个远程资源") and a 显示图片 button.
+
+**`index.css`** - dashed placeholder box for `img[data-blocked-remote]`.
+
+### Corrected my own PRD mid-task
+
+The PRD initially claimed `ADD_TAGS: ["style"]` let `<style>` blocks through. Three test
+failures said otherwise. Root cause is `purify.es.mjs:923` `_initDocument`: it parses via
+DOMParser and returns **only `<body>`**, so anything in `<head>` is discarded before any
+hook runs - unaffected by `ADD_TAGS`/`FORBID_CONTENTS`; only `FORCE_BODY: true` preserves
+it. Rescanned production: 98 of 99 HTML messages put `<style>` in `<head>`, so those
+stylesheets **were already never loading**. Not a regression - existing behavior.
+
+Decided **not** to enable `FORCE_BODY`. It would pull previously-discarded stylesheets
+into the DOM and widen the attack surface, to fix nothing. Fixed the PRD and rewrote the
+tests to assert the real behavior.
+
+### Notes on three fixes worth remembering
+
+- **`@import` counted twice.** `CSS_URL_RE` stripped the inner `url(...)` first, leaving a
+  remnant that `CSS_IMPORT_RE` then removed - one resource, two counts, so the notice
+  would have read "已屏蔽 2 个" for a single file. Fixed the source (run `@import` first),
+  not the test.
+- **The hook is global to the DOMPurify instance.** Leaving it registered would make every
+  later call strip resources, including the one made with blocking *off* - i.e. clicking
+  显示图片 would have done nothing. Removed by identity in `finally`, which stays correct
+  even if something else registers at the same entry point. There is a test for exactly
+  this leak.
+- **Removing `src` is not enough cosmetically.** The browser still paints a broken-image
+  glyph whenever the element carries an `alt`. Blocked images get an inline transparent
+  1x1 GIF (a `data:` URI, so still no request) plus a marker attribute, and their
+  sender-supplied `width`/`height` are dropped - otherwise the placeholder stretches to
+  the original image's dimensions and leaves a large empty gap.
+
+The 显示图片 switch is deliberately per-message and not persisted. "Trust this sender" is
+precisely the choice a tracker wants the reader to make; every message stays an
+independent, explicit decision. State resets via a `key` remount rather than an effect,
+following `EditAccountDialog.tsx:30` - the repo's lint config forbids `setState` in an
+effect body.
+
+### Testing
+
+- [OK] `npm test` - 43/43 pass (22 new, one per vector plus the hook-leak and
+  XSS-still-blocked regressions). jsdom, since DOMPurify needs a real DOM - a stub would
+  have tested the stub.
+- [OK] `npm run lint` - 5 errors, unchanged baseline
+- [OK] `npm run build` - clean
+- [OK] Browser: opening a message with trackers produced **zero** requests
+  (`performance.getEntriesByType("resource")` filtered to tracker hosts returned `[]`),
+  and exactly 3 after clicking 显示图片. That contrast is the proof - an empty list alone
+  could just mean the resources were never there. Reopening returns to blocked.
+- [OK] Browser: verification code 294817 still extracted while blocked (it reads the plain
+  text body, so HTML blocking cannot affect it)
+- [OK] Browser: placeholders render as dashed boxes, no broken-image glyph
+
+### Status
+
+[OK] **Completed** - committed as `c073de7`. **Not deployed** - the user has not asked
+for it.
+
+### Next Steps
+
+- Deploy when requested. Server currently runs `ee44278`.
+- `feat/frontend-ux-improvements` is deployed but still unmerged to `main`.

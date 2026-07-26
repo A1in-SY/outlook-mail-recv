@@ -341,3 +341,108 @@ Verified after `docker compose up -d`:
 
 - `feat/frontend-ux-improvements` is now fully merged; it can be deleted whenever
   convenient.
+
+---
+
+## Session 5: Account Credential Failures Return 409, Not 502
+
+**Date**: 2026-07-26
+**Task**: `07-26-surface-account-auth-failures-instead-of-502`
+**Branch**: `main`
+
+### Summary
+
+User reported that refreshing some mailboxes always 502s. Root cause was not a server
+fault: Microsoft had flagged those accounts and revoked their refresh tokens. The
+deterministic, retry-proof condition was being reported as a transient gateway error.
+
+### Diagnosis
+
+Server logs showed all seven 502s came from one error:
+
+```
+Token refresh failed: 400 - {"error":"invalid_grant",
+ "error_description":"AADSTS70000: User account is found to be in service abuse mode"}
+```
+
+All from `id=26`, while `id=73/74/76` returned 200 in the same window — per-account, not
+global. DB corroborated: of 74 accounts, 16 have zero emails and 7 have
+`updated_at == created_at`, meaning their token has never rotated, i.e. they have never
+refreshed successfully.
+
+One request failed differently: `IMAP auth failed: User is authenticated but not
+connected.` — a token was minted, then the mailbox refused it anyway. Same accounts.
+
+### Why 502 was the wrong code
+
+502 means "the upstream returned an invalid response". Microsoft was working perfectly —
+it returned a well-formed 400 correctly rejecting a dead credential. The broken thing is
+the token in *our* database. `routes/emails.py` caught every `Exception` and flattened
+"this account is permanently banned" and "the connection blipped" into one 502 with one
+fixed sentence, with the real reason going only to the server log. From the UI the two
+were indistinguishable, so the only available move was to keep clicking refresh.
+
+### Main Changes
+
+`AccountAuthError` marks the permanent case in `mail_service.py`; routes catch it ahead
+of the generic handler and return 409 with the reason as `detail`.
+
+Classification dispatches on the **machine-readable `error` field** (`invalid_grant`),
+not on substring matches against `error_description` — that text is prose Microsoft can
+reword at any time. Known `AADSTS` codes map to actionable Chinese; unknown codes fall
+back to a generic "needs re-authorisation" rather than dropping to 502, because
+`invalid_grant` alone already proves the credential is dead.
+
+IMAP auth rejection and Graph 401/403 classify the same way. Timeouts, 5xx, non-JSON
+bodies, and other OAuth errors stay 502.
+
+### The trap that decided the status code
+
+**403 was unusable.** `frontend/src/lib/api.ts:44-48` treats 403 as *this app's* bearer
+token being rejected: `clearToken()` + redirect to login. Had a dead mailbox returned
+403, refreshing a banned account would have signed the operator out of the entire app.
+
+Picked 409: unused elsewhere in this API, and "stored resource conflicts with the
+request" fits. It is not a widespread convention for this case, which is why it is
+written into the spec and pinned by a test asserting the status is not 403.
+
+### Notes
+
+- Logged with `logger.warning` + reason instead of `logger.exception`. A banned account
+  emits one per refresh click; a stack trace each time is noise for an expected,
+  self-explanatory condition.
+- `errorMessage` was already duplicated in two pages and this needed a third copy, so it
+  moved to `lib/error-display.ts` with `showFailure`. The auth case shows the backend
+  reason *without* a "刷新失败: " prefix — prefixing would push the actionable part to
+  the right — and stays up longer, since it asks for re-authorisation, not a retry.
+- `ApiError` had to assign `status` in the constructor body: the tsconfig sets
+  `erasableSyntaxOnly`, which rejects parameter-property shorthand.
+- No local Python ≥3.10 (system is 3.9, repo needs 3.10+), so backend tests ran in a
+  `python:3.12-slim` container — same major version as the Dockerfile.
+
+### Testing
+
+- [OK] Backend `python -m unittest discover -s tests` — 40/40 (23 new: both sides of the
+  permanent/transient split, all three routes, no-credential-leak, and the not-403 pin)
+- [OK] Frontend `npm test` — 47/47 (4 new)
+- [OK] `npm run lint` — 5 errors, unchanged baseline
+- [OK] `npm run build` — clean
+- [OK] **Live check against production.** Unit tests only prove the logic against
+  synthetic responses, so the patched module was run against the real accounts in the
+  container: `id=26` (the account that had been 502-ing) classified as
+  `AccountAuthError` → 409 with the abuse-mode reason, while `id=73` still minted a
+  token. Probe went through the app's own `get_access_token` and wrote nothing; the
+  container's file was restored afterwards and verified unpatched.
+
+### Status
+
+[OK] **Completed** — committed as `85ef010` on `main`. **Not deployed.**
+
+### Next Steps
+
+- Deploy when requested. Server currently runs `e1290b0`.
+- Out of scope by the user's choice, worth revisiting if the dead accounts become a
+  chore: persisting a per-account failed state so the list marks bad accounts, and a
+  bulk validity check. Today, finding which accounts are dead still means clicking each
+  one. Note that repeatedly probing already-flagged accounts risks deepening the
+  Microsoft-side flag, which is why no automatic polling was added.

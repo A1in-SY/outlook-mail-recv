@@ -475,3 +475,36 @@ the fix failing.
   bulk validity check. Today, finding which accounts are dead still means clicking each
   one. Note that repeatedly probing already-flagged accounts risks deepening the
   Microsoft-side flag, which is why no automatic polling was added.
+
+
+## Session 2: 修复收件箱返回当前页并部署
+
+**Date**: 2026-10-09
+**Task**: 修复收件箱返回当前页并部署
+**Branch**: `main`
+
+### Summary
+
+账户列表页码改为 URL 状态，收件箱/垃圾箱携带来源页并正确返回；新增 5 项导航回归测试，前端 52/52 通过、生产构建和改动文件 lint 通过，全量 lint 保持 5 条既有基线。提交已推送至 origin/main，并将 txy-sg 的 Compose 服务从 5652b56 更新到 89afef7；新容器重启数 0，/api/health 正常、首页 200、数据库 integrity_check=ok 且 74 个账户/579 封邮件不变。回滚镜像为 outlook-mail-recv-app:rollback-5652b560c6f0-20261009-234906，数据库备份为 outlook_mail.db.bak-before-deploy-20261009-234906-5652b560c6f0。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89afef7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

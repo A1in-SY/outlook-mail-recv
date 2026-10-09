@@ -44,6 +44,41 @@ Derived state:
 
 - `totalPages`, `allChecked`, `folderName`, `separatorValid`, `filteredPlatforms`, formatted dates, and display text should be derived during render or with `useMemo` when needed.
 
+## Restorable List Navigation
+
+When a list page must survive navigation to a child workflow, keep the page number in the URL instead of component-only state. Component state is discarded when sibling routes unmount and remount.
+
+For the account and email-folder flow:
+
+- `AccountList` reads its page from `?page=N` and omits the parameter for page 1.
+- Folder URLs carry the source as `?accountPage=N`; switching between `INBOX` and `Junk` must preserve it.
+- The folder page builds its explicit return URL from `accountPage`; missing or invalid values return to page 1.
+- Page parsing accepts only positive safe integers. Zero, negative, fractional, malformed, and unsafe values fall back to 1.
+
+Use the shared helpers rather than rebuilding query strings in page components:
+
+```ts
+parseAccountListPage(value: string | null | undefined): number
+accountListPath(page: number): string
+emailFolderPath(accountId: number, folder: "INBOX" | "Junk", accountListPage: number): string
+```
+
+Wrong:
+
+```ts
+const [page, setPage] = useState(1);
+navigate("/");
+```
+
+Correct:
+
+```ts
+const page = parseAccountListPage(searchParams.get(ACCOUNT_LIST_PAGE_PARAM));
+navigate(accountListPath(sourcePage));
+```
+
+Tests must assert non-default-page return paths, folder-switch preservation, default-page omission, and invalid-value fallback.
+
 ## Server State Rules
 
 All server communication goes through `frontend/src/lib/api.ts`.

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type EmailItem } from "@/lib/api";
+import {
+  ACCOUNT_LIST_RETURN_PAGE_PARAM,
+  accountListPath,
+  emailFolderPath,
+  parseAccountListPage,
+} from "@/lib/account-list-navigation";
 import { errorMessage, showFailure } from "@/lib/error-display";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +36,7 @@ type RefreshOptions = {
 export function EmailList() {
   const { accountId, folder } = useParams<{ accountId: string; folder: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [emails, setEmails] = useState<EmailItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -43,6 +50,7 @@ export function EmailList() {
   const [platformOpen, setPlatformOpen] = useState(false);
   const pageSize = 20;
   const accId = Number(accountId);
+  const accountListPage = parseAccountListPage(searchParams.get(ACCOUNT_LIST_RETURN_PAGE_PARAM));
   const folderName = folder === "Junk" ? "垃圾箱" : "收件箱";
 
   const formatReceivedTime = (ts: number) => {
@@ -146,7 +154,7 @@ export function EmailList() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button variant="outline" onClick={() => navigate("/")}>
+                  <Button variant="outline" onClick={() => navigate(accountListPath(accountListPage))}>
                     <ArrowLeft className="w-4 h-4 mr-1" />返回
                   </Button>
                   <Button variant="outline" onClick={() => void refreshAndLoad()} disabled={refreshing}>
@@ -171,7 +179,11 @@ export function EmailList() {
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => navigate(`/emails/${accountId}/${folder === "Junk" ? "INBOX" : "Junk"}`)}
+                    onClick={() => navigate(emailFolderPath(
+                      accId,
+                      folder === "Junk" ? "INBOX" : "Junk",
+                      accountListPage,
+                    ))}
                   >
                     <ExternalLink className="w-4 h-4 mr-1" />
                     {folder === "Junk" ? "收件箱" : "垃圾箱"}

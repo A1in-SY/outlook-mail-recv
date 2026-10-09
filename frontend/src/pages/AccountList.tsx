@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, clearToken, type Account, type AccountUpdate, type MailProtocol } from "@/lib/api";
+import {
+  ACCOUNT_LIST_PAGE_PARAM,
+  emailFolderPath,
+  parseAccountListPage,
+} from "@/lib/account-list-navigation";
 import { errorMessage } from "@/lib/error-display";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -65,9 +70,10 @@ function TruncatedField({ value, max = 20 }: { value: string; max?: number }) {
 
 export function AccountList() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const page = parseAccountListPage(searchParams.get(ACCOUNT_LIST_PAGE_PARAM));
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -85,6 +91,18 @@ export function AccountList() {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const pageSize = 15;
+
+  const setPage = (nextPage: number) => {
+    const safePage = parseAccountListPage(String(nextPage));
+    if (safePage === page) return;
+
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (safePage === 1) next.delete(ACCOUNT_LIST_PAGE_PARAM);
+      else next.set(ACCOUNT_LIST_PAGE_PARAM, String(safePage));
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -393,14 +411,14 @@ export function AccountList() {
                           <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="outline" size="sm" className="h-8 w-8 p-0"
-                              onClick={() => navigate(`/emails/${acc.id}/INBOX`)}
+                              onClick={() => navigate(emailFolderPath(acc.id, "INBOX", page))}
                               title="收件箱" aria-label={`${acc.email} 的收件箱`}
                             >
                               <Inbox className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="outline" size="sm" className="h-8 w-8 p-0"
-                              onClick={() => navigate(`/emails/${acc.id}/Junk`)}
+                              onClick={() => navigate(emailFolderPath(acc.id, "Junk", page))}
                               title="垃圾箱" aria-label={`${acc.email} 的垃圾箱`}
                             >
                               <Trash className="w-4 h-4" />
@@ -444,7 +462,7 @@ export function AccountList() {
                   <Button
                     variant="outline" size="sm"
                     disabled={page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
+                    onClick={() => setPage(page - 1)}
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
@@ -473,7 +491,7 @@ export function AccountList() {
                   <Button
                     variant="outline" size="sm"
                     disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
+                    onClick={() => setPage(page + 1)}
                   >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
